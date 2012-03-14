@@ -13,6 +13,8 @@
 %% KIND, either express or implied.  See the License for the
 %% specific language governing permissions and limitations
 %% under the License.
+-ifndef(__LAGER_HRL__).
+-define(__LAGER_HRL__, true).
 
 -define(LEVELS,
     [debug, info, notice, warning, error, critical, alert, emergency, none]).
@@ -50,6 +52,7 @@
         ?ALERT -> alert;
         ?EMERGENCY -> emergency
     end).
+
 
 -define(SHOULD_LOG(Level),
     lager_util:level_to_num(Level) =< element(1, lager_mochiglobal:get(loglevel, {?LOG_NONE, []}))).
@@ -92,4 +95,6 @@
                     end
             end
     end)).
+-endif.
+
 -endif.
