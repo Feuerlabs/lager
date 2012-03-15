@@ -29,6 +29,12 @@
         minimum_loglevel/1, posix_error/1,
         safe_format/3, safe_format_chop/3,dispatch_log/8]).
 
+%% Fallback when parse transform is not available
+-export([debug/1,debug/2,debug/3]).
+-export([warning/1,warning/2,warning/3]).
+-export([error/1,error/2,error/3]).
+-export([critical/1,critical/2,critical/3]).
+
 -type log_level() :: debug | info | notice | warning | error | critical | alert | emergency.
 -type log_level_number() :: 0..7.
 
@@ -292,3 +298,43 @@ safe_format(Fmt, Args, Limit, Options) ->
 %% @private
 safe_format_chop(Fmt, Args, Limit) ->
     safe_format(Fmt, Args, Limit, [{chomp, true}]).
+
+debug(Fmt)    -> dyn_log(debug, [], Fmt, []).
+debug(Fmt,Args) -> dyn_log(debug, [], Fmt, Args).
+debug(Attrs,Fmt,Args) -> dyn_log(debug, Attrs, Fmt, Args).
+
+warning(Fmt)    -> dyn_log(warning, [], Fmt, []).
+warning(Fmt,Args) -> dyn_log(warning, [], Fmt, Args).
+warning(Attrs,Fmt,Args) -> dyn_log(warning, Attrs, Fmt, Args).
+
+error(Fmt)    -> dyn_log(error, [], Fmt, []).
+error(Fmt,Args) -> dyn_log(error, [], Fmt, Args).
+error(Attrs,Fmt,Args) -> dyn_log(error, Attrs, Fmt, Args).
+
+critical(Fmt)    -> dyn_log(critical, [], Fmt, []).
+critical(Fmt,Args) -> dyn_log(critical, [], Fmt, Args).
+critical(Attrs,Fmt,Args) -> dyn_log(critical, Attrs, Fmt, Args).
+
+dyn_log(Severity, Attrs, Fmt, Args) ->
+    try (fail=ure) of
+	_ -> strange
+    catch
+	error:_ ->
+	    case erlang:get_stacktrace() of
+		[_,{M,F,_A}|_] ->
+		    dispatch_log(Severity, M, F, 0, self(),
+				 [{module,M},{function,F},
+				  {pid,pid_to_list(self())}|
+				  Attrs],
+				 Fmt, Args);
+		[_,{M,F,_A,Loc}|_] ->
+		    L = proplists:get_value(line,Loc,0),
+		    dispatch_log(Severity, M, F, L, self(),
+				 [{module,M},{function,F},
+				  {line,L},{pid,pid_to_list(self())}|
+				  Attrs],
+				 Fmt, Args);
+		[] ->
+		    erlang:display({Severity, Fmt})
+	    end
+    end.
