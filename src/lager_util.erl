@@ -22,6 +22,7 @@
         ensure_logfile/4, rotate_logfile/2, format_time/0, format_time/1,
         localtime_ms/0, maybe_utc/1, parse_rotation_date_spec/1,
         calculate_next_rotation/1, validate_trace/1, check_traces/4]).
+-export([check_f_traces/4]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -294,6 +295,21 @@ validate_trace({Filter, Level, Destination}) when is_list(Filter), is_atom(Level
     end;
 validate_trace(_) ->
     {error, invalid_trace}.
+
+
+check_f_traces(_, _, [], Acc) ->
+    lists:flatten(Acc);
+check_f_traces(AttrFun, Level, [{_, FilterLevel, _}|Flows], Acc) 
+  when Level > FilterLevel ->
+    check_f_traces(AttrFun, Level, Flows, Acc);
+check_f_traces(AttrFun, Level, [Flow|Flows], Acc) ->
+    check_traces(AttrFun, Level, Flows, [check_f_trace(AttrFun, Flow)|Acc]).
+
+check_f_trace(AttrFun, {Filter, _Level, Dest}) ->
+    case lists:all(AttrFun, Filter) of
+	true -> Dest;
+	false -> []
+    end.
 
 
 check_traces(_, _,  [], Acc) ->

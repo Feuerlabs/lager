@@ -27,13 +27,19 @@
         clear_all_traces/0, stop_trace/1, status/0,
         get_loglevel/1, set_loglevel/2, set_loglevel/3, get_loglevels/0,
         minimum_loglevel/1, posix_error/1,
-        safe_format/3, safe_format_chop/3,dispatch_log/8]).
+        safe_format/3, safe_format_chop/3,dispatch_log/8,
+	dispatch_log1/9]).
 
 %% Fallback when parse transform is not available
 -export([debug/1,debug/2,debug/3]).
+-export([info/1,info/2,info/3]).
+-export([notice/1,notice/2,notice/3]).
 -export([warning/1,warning/2,warning/3]).
 -export([error/1,error/2,error/3]).
 -export([critical/1,critical/2,critical/3]).
+-export([alert/1,alert/2,alert/3]).
+-export([emergency/1,emergency/2,emergency/3]).
+-export([none/1,none/2,none/3]).
 
 -type log_level() :: debug | info | notice | warning | error | critical | alert | emergency.
 -type log_level_number() :: 0..7.
@@ -57,10 +63,9 @@ start_ok(App, {error, {not_started, Dep}}) ->
 start_ok(App, {error, Reason}) -> 
     erlang:error({app_start_failed, App, Reason}).
 
-
 -spec dispatch_log(log_level(), atom(), atom(), pos_integer(), pid(), list(), string(), list()) ->
     ok | {error, lager_not_running}.
-
+%% Still used by dyn_log
 dispatch_log(Severity, Module, Function, Line, Pid, Traces, Format, Args) ->
     {LevelThreshold,TraceFilters} = lager_mochiglobal:get(loglevel,{?LOG_NONE,[]}),
     Result=
@@ -82,6 +87,29 @@ dispatch_log(Severity, Module, Function, Line, Pid, Traces, Format, Args) ->
                 Format,Args);
         _ -> ok
     end.
+
+%% 
+%% Like dispatch_log/8 but uses a new transform where 
+%% level is checked before arguments are evaluated.
+%%
+dispatch_log1([],Severity,Mod,Fun,Line,Pid,_FTraces,Format,Args) ->
+    lager:log(Severity,Mod,Fun,Line,Pid,
+	      lager_util:maybe_utc(lager_util:localtime_ms()),
+	      Format,Args);
+dispatch_log1(Match,Severity,Mod,Fun,Line,Pid,FTraces,Format,Args)
+  when is_list(Match) ->
+    lager:log(Severity,Mod,Fun,Line,Pid,
+	      lager_util:maybe_utc(lager_util:localtime_ms()),
+	      Format,Args),
+    lager:log_dest(Severity,Mod,Fun,Line,Pid,
+		   lager_util:maybe_utc(lager_util:localtime_ms()),
+		   lager_util:check_f_traces(FTraces,
+					     lager_util:level_to_num(Severity),
+					     Match,[]),
+		   Format,Args);
+dispatch_log1(_,_Severity,_Mod,_Func,_Line,_Pid,_FTraces,_Format,_Args) ->
+    ok.
+
 
 %% @private
 -spec log(log_level(), atom(), atom(), pos_integer(), pid(), tuple(), string(), list()) ->
@@ -298,10 +326,21 @@ safe_format(Fmt, Args, Limit, Options) ->
 %% @private
 safe_format_chop(Fmt, Args, Limit) ->
     safe_format(Fmt, Args, Limit, [{chomp, true}]).
-
+%%
+%% when code is not compiled with parse_transform the following code
+%% is used instead. maybe warn about the fact?
+%%
 debug(Fmt)    -> dyn_log(debug, [], Fmt, []).
 debug(Fmt,Args) -> dyn_log(debug, [], Fmt, Args).
 debug(Attrs,Fmt,Args) -> dyn_log(debug, Attrs, Fmt, Args).
+
+info(Fmt)    -> dyn_log(info, [], Fmt, []).
+info(Fmt,Args) -> dyn_log(info, [], Fmt, Args).
+info(Attrs,Fmt,Args) -> dyn_log(info, Attrs, Fmt, Args).
+
+notice(Fmt)    -> dyn_log(notice, [], Fmt, []).
+notice(Fmt,Args) -> dyn_log(notice, [], Fmt, Args).
+notice(Attrs,Fmt,Args) -> dyn_log(notice, Attrs, Fmt, Args).
 
 warning(Fmt)    -> dyn_log(warning, [], Fmt, []).
 warning(Fmt,Args) -> dyn_log(warning, [], Fmt, Args).
@@ -315,8 +354,24 @@ critical(Fmt)    -> dyn_log(critical, [], Fmt, []).
 critical(Fmt,Args) -> dyn_log(critical, [], Fmt, Args).
 critical(Attrs,Fmt,Args) -> dyn_log(critical, Attrs, Fmt, Args).
 
+alert(Fmt)    -> dyn_log(alert, [], Fmt, []).
+alert(Fmt,Args) -> dyn_log(alert, [], Fmt, Args).
+alert(Attrs,Fmt,Args) -> dyn_log(alert, Attrs, Fmt, Args).
+
+emergency(Fmt)    -> dyn_log(emergency, [], Fmt, []).
+emergency(Fmt,Args) -> dyn_log(emergency, [], Fmt, Args).
+emergency(Attrs,Fmt,Args) -> dyn_log(emergency, Attrs, Fmt, Args).
+
+none(Fmt)    -> dyn_log(none, [], Fmt, []).
+none(Fmt,Args) -> dyn_log(none, [], Fmt, Args).
+none(Attrs,Fmt,Args) -> dyn_log(none, Attrs, Fmt, Args).
+
+%% @private
+-spec dyn_log(log_level(), list(), string(), list()) -> 
+		     ok | {error, lager_not_running}.
+
 dyn_log(Severity, Attrs, Fmt, Args) ->
-    try (fail=ure) of
+    try erlang:error(fail) of 
 	_ -> strange
     catch
 	error:_ ->
