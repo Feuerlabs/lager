@@ -303,7 +303,7 @@ check_f_traces(AttrFun, Level, [{_, FilterLevel, _}|Flows], Acc)
   when Level > FilterLevel ->
     check_f_traces(AttrFun, Level, Flows, Acc);
 check_f_traces(AttrFun, Level, [Flow|Flows], Acc) ->
-    check_traces(AttrFun, Level, Flows, [check_f_trace(AttrFun, Flow)|Acc]).
+    check_f_traces(AttrFun, Level, Flows, [check_f_trace(AttrFun, Flow)|Acc]).
 
 check_f_trace(AttrFun, {Filter, _Level, Dest}) ->
     case lists:all(AttrFun, Filter) of
