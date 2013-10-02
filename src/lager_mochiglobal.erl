@@ -17,9 +17,9 @@ get(K, Default) ->
     get(K, Default, key_to_module(K)).
 
 get(_K, Default, Mod) ->
-    try Mod:term()
-    catch error:undef ->
-            Default
+    case erlang:function_exported(Mod,term,0) of
+	true -> Mod:term();
+	false -> Default
     end.
 
 -spec put(atom(), any()) -> ok.
